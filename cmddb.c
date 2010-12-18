@@ -37,6 +37,14 @@ const struct cmddb_record commands[] = {
 "    name as an argument, displays help for that command.\n"
 	},
 	{
+		.name = "launchpad",
+		.func = cmd_launchpad,
+		.help =
+"launchpad [filename1] [filename2]\n"
+"    Write filename1 to flash memory from 0xf800 and \n"
+"    filename2 to flash memory from 0xffc0 .\n"
+	},
+	{
 		.name = "opt",
 		.func = cmd_opt,
 		.help =

@@ -536,9 +536,73 @@ static int do_cmd_prog(char **arg, int prog_flags)
 	return 0;
 }
 
+static int do_launchpad(char **arg, int prog_flags)
+{
+	FILE *pf1;
+	FILE *pf2;
+	struct prog_data prog;
+	struct prog_data vect;
+	char *f_name1 = get_arg(arg);
+	char *f_name2 = get_arg(arg);
+
+	if(!(f_name1 && f_name2)) {
+	        printc_err("usage: launchpad [filename1] [filename2]\n");
+		return -1;
+	}
+
+	if (prompt_abort(MODIFY_SYMS))
+		return 0;
+
+	pf1 = fopen(f_name1, "r");
+	pf2 = fopen(f_name2, "r");
+
+	if (!(pf1 && pf2)) {
+		printc_err("launchpad: %s: %s\n", *arg, strerror(errno));
+		return -1;
+	}
+
+	if (device_default->ctl(device_default, DEVICE_CTL_HALT) < 0) {
+		fclose(pf1);
+		fclose(pf2);
+		return -1;
+	}
+
+	prog_init(&prog, prog_flags);
+	prog_init(&vect, prog_flags);
+
+	prog.len = (int)fread(&prog.buf, sizeof(uint8_t), PROG_BUFSIZE, pf1);
+	prog.addr = 0xf800;
+
+	vect.len = (int)fread(&vect.buf, sizeof(uint8_t), PROG_BUFSIZE, pf2);
+	vect.addr = 0xffe0;
+	vect.have_erased = 1;
+
+	fclose(pf1);
+	fclose(pf2);
+
+	if (prog_flush(&prog) < 0)
+	        return -1;
+
+	if (prog_flush(&vect) < 0)
+	        return -1;
+
+	if (device_default->ctl(device_default, DEVICE_CTL_RESET) < 0) {
+		printc_err("launchpad: failed to reset after programming\n");
+		return -1;
+	}
+
+	unmark_modified(MODIFY_SYMS);
+	return 0;
+}
+
 int cmd_prog(char **arg)
 {
 	return do_cmd_prog(arg, PROG_WANT_ERASE);
+}
+
+int cmd_launchpad(char **arg)
+{
+        return do_launchpad(arg, PROG_WANT_ERASE);
 }
 
 int cmd_load(char **arg)
