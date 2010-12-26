@@ -540,13 +540,16 @@ static int do_launchpad(char **arg, int prog_flags)
 {
 	FILE *pf1;
 	FILE *pf2;
+	FILE *pf3;
 	struct prog_data prog;
 	struct prog_data vect;
+	struct prog_data info;
 	char *f_name1 = get_arg(arg);
 	char *f_name2 = get_arg(arg);
+	char *f_name3 = get_arg(arg);
 
-	if(!(f_name1 && f_name2)) {
-	        printc_err("usage: launchpad [filename1] [filename2]\n");
+	if(!(f_name1 && f_name2 && f_name3)) {
+	        printc_err("usage: launchpad [filename1] [filename2] [filename3]\n");
 		return -1;
 	}
 
@@ -555,8 +558,9 @@ static int do_launchpad(char **arg, int prog_flags)
 
 	pf1 = fopen(f_name1, "r");
 	pf2 = fopen(f_name2, "r");
+	pf3 = fopen(f_name3, "r");
 
-	if (!(pf1 && pf2)) {
+	if (!(pf1 && pf2 && pf3)) {
 		printc_err("launchpad: %s: %s\n", *arg, strerror(errno));
 		return -1;
 	}
@@ -564,21 +568,37 @@ static int do_launchpad(char **arg, int prog_flags)
 	if (device_default->ctl(device_default, DEVICE_CTL_HALT) < 0) {
 		fclose(pf1);
 		fclose(pf2);
+		fclose(pf3);
 		return -1;
 	}
 
 	prog_init(&prog, prog_flags);
 	prog_init(&vect, prog_flags);
+	prog_init(&info, prog_flags);
 
-	prog.len = (int)fread(&prog.buf, sizeof(uint8_t), PROG_BUFSIZE, pf1);
+	info.len = (int)fread(&info.buf, sizeof(uint8_t), 254, pf1);
+	info.addr = 0x1000;
+
+	prog.len = (int)fread(&prog.buf, sizeof(uint8_t), 1984, pf2);
 	prog.addr = 0xf800;
+	prog.have_erased = 1;
 
-	vect.len = (int)fread(&vect.buf, sizeof(uint8_t), PROG_BUFSIZE, pf2);
+	vect.len = (int)fread(&vect.buf, sizeof(uint8_t), 32, pf3);
 	vect.addr = 0xffe0;
 	vect.have_erased = 1;
 
+
 	fclose(pf1);
 	fclose(pf2);
+	fclose(pf3);
+
+	if(prog.len == 0 || vect.len == 0 || info.len == 0){
+	  printc_err("File size error\n");
+	  return -1;
+	}
+
+	if (prog_flush(&info) < 0)
+	        return -1;
 
 	if (prog_flush(&prog) < 0)
 	        return -1;

@@ -40,9 +40,10 @@ const struct cmddb_record commands[] = {
 		.name = "launchpad",
 		.func = cmd_launchpad,
 		.help =
-"launchpad [filename1] [filename2]\n"
-"    Write filename1 to flash memory from 0xf800 and \n"
-"    filename2 to flash memory from 0xffc0 .\n"
+"launchpad [filename1] [filename2] [filename3]\n"
+"    Write filename1 to flash memory from 0x1000 and \n"
+"    filename2 to flash memory from 0xf800 and \n"
+"    filename3 to flash memory from 0xffc0 . \n"
 	},
 	{
 		.name = "opt",
