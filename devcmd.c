@@ -544,6 +544,9 @@ static int do_launchpad(char **arg, int prog_flags)
 	struct prog_data prog;
 	struct prog_data vect;
 	struct prog_data info;
+
+	address_t prog_addr = 0xf800;
+
 	char *f_name1 = get_arg(arg);
 	char *f_name2 = get_arg(arg);
 	char *f_name3 = get_arg(arg);
@@ -576,35 +579,69 @@ static int do_launchpad(char **arg, int prog_flags)
 	prog_init(&vect, prog_flags);
 	prog_init(&info, prog_flags);
 
-	info.len = (int)fread(&info.buf, sizeof(uint8_t), 254, pf1);
+	info.len  = (int)fread(&info.buf, sizeof(uint8_t), PROG_BUFSIZE, pf1);
 	info.addr = 0x1000;
+	info.have_erased = 0;
 
-	prog.len = (int)fread(&prog.buf, sizeof(uint8_t), 1984, pf2);
-	prog.addr = 0xf800;
+	if (prog_flush(&info) < 0){
+	  fclose(pf1);
+	  fclose(pf2);
+	  fclose(pf3);
+	  return -1;
+	}
+
+	info.len  = (int)fread(&info.buf, sizeof(uint8_t), 126, pf1);
+	info.addr = 0x1000 + PROG_BUFSIZE;
+	info.have_erased = 1;
+
+	if (prog_flush(&info) < 0){
+	  fclose(pf1);
+	  fclose(pf2);
+	  fclose(pf3);
+	  return -1;
+	}
+
+	prog.len  = (int)fread(&prog.buf, sizeof(uint8_t), PROG_BUFSIZE, pf2);
+	prog.addr = prog_addr;
 	prog.have_erased = 1;
+
+	if (prog_flush(&prog) < 0){
+	  fclose(pf1);
+	  fclose(pf2);
+	  fclose(pf3);
+	  return -1;
+	}
+
+	while(1){
+	  prog.len  = (int)fread(&prog.buf, sizeof(uint8_t), PROG_BUFSIZE, pf2);
+	  if(prog.len == PROG_BUFSIZE) {
+	    prog.addr = prog_addr + PROG_BUFSIZE;
+	    prog.have_erased = 1;
+	    if (prog_flush(&prog) < 0){
+	      fclose(pf1);
+	      fclose(pf2);
+	      fclose(pf3);
+	      return -1;
+	    }
+	  }else{
+	    break;
+	  }
+	}
 
 	vect.len = (int)fread(&vect.buf, sizeof(uint8_t), 32, pf3);
 	vect.addr = 0xffe0;
 	vect.have_erased = 1;
 
-
-	fclose(pf1);
-	fclose(pf2);
-	fclose(pf3);
-
-	if(prog.len == 0 || vect.len == 0 || info.len == 0){
-	  printc_err("File size error\n");
-	  return -1;
+	if (prog_flush(&vect) < 0){
+	      fclose(pf1);
+	      fclose(pf2);
+	      fclose(pf3);
+	      return -1;
 	}
 
-	if (prog_flush(&info) < 0)
-	        return -1;
-
-	if (prog_flush(&prog) < 0)
-	        return -1;
-
-	if (prog_flush(&vect) < 0)
-	        return -1;
+        fclose(pf1);
+	fclose(pf2);
+	fclose(pf3);
 
 	if (device_default->ctl(device_default, DEVICE_CTL_RESET) < 0) {
 		printc_err("launchpad: failed to reset after programming\n");
